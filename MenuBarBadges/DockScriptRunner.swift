@@ -17,6 +17,9 @@ enum DockScanError: Error {
 }
 
 actor DockScriptRunner {
+    // Keep the compiled script on this actor instead of recompiling every poll.
+    private var cachedScript: NSAppleScript?
+
     func fetchApplications() throws -> [Application] {
         return try autoreleasepool {
             let scriptSource = """
@@ -52,9 +55,10 @@ actor DockScriptRunner {
             end tell
         """
 
-            guard let script = NSAppleScript(source: scriptSource) else {
+            guard let script = cachedScript ?? NSAppleScript(source: scriptSource) else {
                 throw DockScanError.scriptCreationFailed
             }
+            cachedScript = script
             var errorInfo: NSDictionary?
             let descriptor = script.executeAndReturnError(&errorInfo)
             if let errorInfo {

@@ -6,6 +6,16 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		C7466E18308C77E2007E2696 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C7B320A72E892E8F002F0959 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C7B320AE2E892E8F002F0959;
+			remoteInfo = MenuBarBadges;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		C7466E11308C7264007E2696 /* NotiBarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotiBarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C7B320AF2E892E8F002F0959 /* NotiBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NotiBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -76,6 +86,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				C7466E19308C77E2007E2696 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				C7466E12308C7264007E2696 /* NotiBarTests */,
@@ -121,6 +132,7 @@
 				TargetAttributes = {
 					C7466E10308C7264007E2696 = {
 						CreatedOnToolsVersion = 27.1;
+						TestTargetID = C7B320AE2E892E8F002F0959;
 					};
 					C7B320AE2E892E8F002F0959 = {
 						CreatedOnToolsVersion = 26.0.1;
@@ -182,11 +194,19 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		C7466E19308C77E2007E2696 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C7B320AE2E892E8F002F0959 /* MenuBarBadges */;
+			targetProxy = C7466E18308C77E2007E2696 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		C7466E16308C7264007E2696 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(BUILT_PRODUCTS_DIR)/NotiBar.app/Contents/MacOS/NotiBar.debug.dylib";
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -203,7 +223,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NotiBar.app/Contents/MacOS/NotiBar";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NotiBar.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/NotiBar";
 				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Debug;
@@ -211,7 +231,7 @@
 		C7466E17308C7264007E2696 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(BUILT_PRODUCTS_DIR)/NotiBar.app/Contents/MacOS/NotiBar.debug.dylib";
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -228,7 +248,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NotiBar.app/Contents/MacOS/NotiBar";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NotiBar.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/NotiBar";
 				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Release;

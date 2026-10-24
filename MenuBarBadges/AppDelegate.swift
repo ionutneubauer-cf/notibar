@@ -428,7 +428,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverD
         guard autoRefreshEnabled, !isSleeping, refreshTask == nil else { return }
 
         let newTimer = Timer(timeInterval: effectiveRefreshInterval, repeats: false) { [weak self] _ in
-            Task { @MainActor in self?.updateMenuBarDisplay() }
+            Task { @MainActor [weak self] in self?.updateMenuBarDisplay() }
         }
         // Add to common modes so it continues while menus/popovers are active
         RunLoop.main.add(newTimer, forMode: .common)

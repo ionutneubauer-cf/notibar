@@ -36,7 +36,7 @@ enum AutomationPermissionStatus {
     }
 }
 
-struct Application: Identifiable, Equatable, Sendable {
+nonisolated struct Application: Identifiable, Equatable, Sendable {
     let name: String
     let badgeCount: Int
     var applicationURL: URL? = nil
