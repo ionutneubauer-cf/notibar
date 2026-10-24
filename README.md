@@ -31,8 +31,8 @@ Requires **macOS 15.6 or later** and an Xcode version with **Swift 6.2 or later*
 1. Clone the repository:
 
    ```sh
-   git clone https://github.com/ionutneubauer-cf/menubar.git
-   cd menubar
+   git clone https://github.com/ionutneubauer-cf/notibar.git
+   cd notibar
    open MenuBarBadges.xcodeproj
    ```
 

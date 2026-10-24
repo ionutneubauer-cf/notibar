@@ -241,7 +241,7 @@ Check **Launch at Login** and any approval message in NotiBar. Review macOS Logi
 
 ### Still need help?
 
-Report a problem through the [repository’s Issues page](https://github.com/ionutneubauer-cf/menubar/issues) if available. Include your macOS version, NotiBar version from Help, display mode, relevant settings, steps to reproduce, and any status message. Screenshots are useful; hide personal app names or counts before sharing if needed.
+Report a problem through the [repository’s Issues page](https://github.com/ionutneubauer-cf/notibar/issues) if available. Include your macOS version, NotiBar version from Help, display mode, relevant settings, steps to reproduce, and any status message. Screenshots are useful; hide personal app names or counts before sharing if needed.
 
 ## Frequently asked questions
 
