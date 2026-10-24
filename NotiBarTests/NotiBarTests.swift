@@ -1,15 +1,24 @@
 import Testing
 import AppKit
+import UserNotifications
 @testable import NotiBar
+
+@MainActor
+private final class NotificationSpy: AppDelegate {
+    var delivered: [[Application]] = []
+    override func postIncreaseNotification(for apps: [Application]) {
+        delivered.append(apps)
+    }
+}
 
 @Suite(.serialized)
 @MainActor
 struct NotiBarTests {
     // Restore preferences because the production setters persist immediately.
-    private func withDelegate(_ body: (AppDelegate) async throws -> Void) async rethrows {
+    private func withDelegate(_ body: (NotificationSpy) async throws -> Void) async rethrows {
         let keys = ["displayMode", "autoRefreshEnabled", "refreshInterval"]
         let saved = keys.map { UserDefaults.standard.object(forKey: $0) }
-        let delegate = AppDelegate()
+        let delegate = NotificationSpy()
         delegate.autoRefreshEnabled = false
         delegate.soundOnIncrease = false
         delegate.notificationOnIncrease = false
@@ -24,12 +33,67 @@ struct NotiBarTests {
         try await body(delegate)
     }
 
+    @Test(arguments: [DisplayMode.popover, .direct])
+    func notificationsCoverIncreasesAndNewApps(mode: DisplayMode) async {
+        await withDelegate { delegate in
+            delegate.displayMode = mode
+            delegate.updateMenuBarDisplay()
+            await delegate.waitForRefresh()
+            delegate.notificationOnIncrease = true
+            delegate.blinkingEnabled = false
+            delegate.fetchDockApplications = { [Application(name: "Example", badgeCount: 1)] }
+            delegate.updateMenuBarDisplay()
+            await delegate.waitForRefresh()
+            #expect(delegate.delivered.count == 1)
+            delegate.fetchDockApplications = { [Application(name: "Example", badgeCount: 2)] }
+            delegate.updateMenuBarDisplay()
+            await delegate.waitForRefresh()
+            #expect(delegate.delivered.count == 2)
+            #expect(delegate.delivered.last?.first?.badgeCount == 2)
+            delegate.updateMenuBarDisplay()
+            await delegate.waitForRefresh()
+            #expect(delegate.delivered.count == 2)
+            delegate.notificationOnIncrease = false
+            delegate.fetchDockApplications = { [Application(name: "Example", badgeCount: 3)] }
+            delegate.updateMenuBarDisplay()
+            await delegate.waitForRefresh()
+            #expect(delegate.delivered.count == 2)
+        }
+    }
+
+    @Test func disabledNotificationsBlockManualTests() {
+        let delegate = AppDelegate()
+        delegate.notificationOnIncrease = false
+        delegate.sendTestNotification()
+        #expect(!delegate.isTestingNotification)
+        #expect(delegate.notificationTestResult == "Turn on System notifications before sending a test.")
+    }
+
     @Test func previewInitializationIsSafe() {
         let delegate = AppDelegate()
         delegate.togglePopover(nil)
         delegate.updateMenuBarDisplay()
         #expect(delegate.popover == nil)
         #expect(!delegate.isRefreshing)
+    }
+
+    @Test func existingBadgesFillIconWithoutAlerting() async throws {
+        try await withDelegate { delegate in
+            delegate.updateMenuBarDisplay()
+            await delegate.waitForRefresh()
+            let outline = try #require(delegate.statusBarItem.button?.image)
+            delegate.fetchDockApplications = { [Application(name: "Example", badgeCount: 3)] }
+            delegate.updateMenuBarDisplay()
+            await delegate.waitForRefresh()
+            let filled = try #require(delegate.statusBarItem.button?.image)
+            #expect(filled !== outline)
+            #expect(filled.isTemplate)
+            #expect(delegate.statusBarItem.button?.contentTintColor == nil)
+            delegate.fetchDockApplications = { [] }
+            delegate.updateMenuBarDisplay()
+            await delegate.waitForRefresh()
+            #expect(delegate.statusBarItem.button?.image === outline)
+        }
     }
 
     @Test func firstScanIsQuietAndLaterIncreaseAlerts() async {

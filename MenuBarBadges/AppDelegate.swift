@@ -7,7 +7,7 @@ import ServiceManagement
 
 @available(macOS 12.0, *)
 @MainActor
-class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverDelegate, UNUserNotificationCenterDelegate {
     var statusBarItem: NSStatusItem!
     var popover: NSPopover?
     @Published var displayMode: DisplayMode = .popover {
@@ -43,7 +43,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverD
     @Published var blinkingEnabled: Bool = true
     @Published var lastIncreaseSummary: String? = nil
     @Published var soundOnIncrease: Bool = true
-    @Published var notificationOnIncrease: Bool = true
+    @Published private(set) var notificationStatus = "Checking…"
+    @Published private(set) var notificationTestResult: String?
+    @Published private(set) var isTestingNotification = false
+    @Published private(set) var notificationError: String?
+    private var notificationGeneration = 0
+    @Published var notificationOnIncrease: Bool = true {
+        didSet {
+            guard notificationOnIncrease != oldValue else { return }
+            notificationGeneration += 1
+            if !notificationOnIncrease && notificationsSupported {
+                UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+            }
+        }
+    }
     @Published var popoverBannerOnIncrease: Bool = true
     @Published var showSearchBar: Bool = true
     @Published var menuBarSummaryEnabled: Bool = false {
@@ -120,6 +133,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverD
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // Test hosts must not start real Dock scans or request permissions.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        if notificationsSupported { UNUserNotificationCenter.current().delegate = self }
         loadSettings()
         refreshLoginItemStatus()
         let workspaceCenter = NSWorkspace.shared.notificationCenter
@@ -209,7 +223,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverD
 
         // Request notification permission for banner alerts only if supported (built as .app)
         if notificationsSupported {
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+            Task { await refreshNotificationStatus(requestPermission: true) }
         }
         // Prime Accessibility status
         accessibilityTrusted = AXIsProcessTrusted()
@@ -413,6 +427,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverD
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
+        Task { await refreshNotificationStatus() }
         refreshLoginItemStatus()
         // Refresh accessibility status when returning from System Settings
         accessibilityTrusted = AXIsProcessTrusted()
@@ -580,7 +595,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverD
 
         if displayMode == .popover {
             configureButtonForIconOnly()
-            setPopoverIcon(isAlert: pendingIconAlert)
+            setPopoverIcon()
         } else {
             updateTitle(appsWithBadges: applicationsWithBadges)
         }
@@ -644,7 +659,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverD
                 if !increasedApps.isEmpty && self.popoverBannerOnIncrease {
                     self.showPopoverBanner(for: increasedApps, newBadgeCounts: newBadgeCounts)
                 }
-                self.setPopoverIcon(isAlert: self.pendingIconAlert)
+                self.setPopoverIcon()
             } else if !increasedApps.isEmpty && self.blinkingEnabled {
                 self.startBlinking(appsWithBadges: appsWithBadges, newBadgeCounts: newBadgeCounts)
             } else {
@@ -714,15 +729,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverD
 
     // removed temporary tint method (unused)
 
-    // Blinking removed
-    func setPopoverIcon(isAlert: Bool) {
+    // Badge presence determines the icon, independently of new-activity alerts.
+    func setPopoverIcon() {
         prepareStatusIcons()
         guard let button = statusBarItem.button else { return }
         button.title = ""
         button.attributedTitle = NSAttributedString(string: "")
-        let image = isAlert ? (iconAlert ?? iconNormal) : iconNormal
+        let hasBadges = applicationsWithBadges.contains { $0.badgeCount > 0 }
+        let image = hasBadges ? (iconAlert ?? iconNormal) : iconNormal
         button.image = image
-        button.contentTintColor = isAlert ? .systemRed : nil
+        button.contentTintColor = nil
         button.toolTip = "Open NotiBar"
     }
 
@@ -770,7 +786,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverD
             normal.size = size
             iconNormal = normal
         }
-        if iconAlert == nil, let alert = NSImage(systemSymbolName: "bell.badge.fill", accessibilityDescription: "NotiBar Alert") {
+        if iconAlert == nil, let alert = NSImage(systemSymbolName: "bell.fill", accessibilityDescription: "NotiBar: unread badges") {
             alert.isTemplate = true
             alert.size = size
             iconAlert = alert
@@ -816,7 +832,112 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverD
         return apps.map { "\($0.name): \($0.badgeCount)" }.joined(separator: " | ")
     }
 
+
+    // Foreground apps must explicitly opt in to banner presentation.
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        Task { @MainActor [weak self] in
+            completionHandler(self?.notificationOnIncrease == true ? [.banner, .list, .sound] : [])
+        }
+    }
+
+    @discardableResult
+    func refreshNotificationStatus(requestPermission: Bool = false) async -> Bool {
+        guard notificationsSupported else { return false }
+        let center = UNUserNotificationCenter.current()
+        notificationError = nil
+        var settings = await center.notificationSettings()
+        if requestPermission && settings.authorizationStatus == .notDetermined {
+            do {
+                _ = try await center.requestAuthorization(options: [.alert, .sound])
+                settings = await center.notificationSettings()
+            } catch {
+                notificationError = error.localizedDescription
+            }
+        }
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            notificationStatus = settings.alertSetting == .enabled ? "Allowed" : "Banners disabled"
+            if settings.alertSetting != .enabled {
+                notificationError = "Enable notification alerts for NotiBar in System Settings."
+            }
+        case .denied:
+            notificationStatus = "Not allowed"
+            notificationError = "Allow notifications for NotiBar in System Settings."
+        case .notDetermined:
+            notificationStatus = "Not requested"
+        @unknown default:
+            notificationStatus = "Unknown"
+        }
+        return settings.authorizationStatus == .authorized
+            || settings.authorizationStatus == .provisional
+    }
+
+    func openNotificationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func sendTestNotification() {
+        guard notificationOnIncrease else {
+            notificationTestResult = "Turn on System notifications before sending a test."
+            return
+        }
+        guard !isTestingNotification else { return }
+        let generation = notificationGeneration
+        isTestingNotification = true
+        notificationTestResult = "Checking permission…"
+        Task {
+            defer { isTestingNotification = false }
+            let center = UNUserNotificationCenter.current()
+            center.delegate = self
+            guard await refreshNotificationStatus(requestPermission: true) else {
+                notificationTestResult = "Not sent. Allow notifications in macOS Settings."
+                return
+            }
+            guard notificationOnIncrease, generation == notificationGeneration else {
+                notificationTestResult = "Cancelled: system notifications were turned off."
+                return
+            }
+            let content = UNMutableNotificationContent()
+            content.title = "NotiBar test notification"
+            content.body = "Notification check at \(Date().formatted(date: .omitted, time: .standard))."
+            content.sound = .default
+            let request = UNNotificationRequest(
+                identifier: UUID().uuidString,
+                content: content,
+                trigger: UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)
+            )
+            do {
+                try await center.add(request)
+                guard notificationOnIncrease, generation == notificationGeneration else {
+                    center.removePendingNotificationRequests(withIdentifiers: [request.identifier])
+                    center.removeDeliveredNotifications(withIdentifiers: [request.identifier])
+                    notificationTestResult = "Cancelled: system notifications were turned off."
+                    return
+                }
+                notificationTestResult = "Accepted by macOS. Waiting for delivery…"
+                try await Task.sleep(for: .seconds(4))
+                let delivered = await center.deliveredNotifications()
+                if delivered.contains(where: { $0.request.identifier == request.identifier }) {
+                    notificationTestResult = "Delivered to Notification Center. If no banner appeared, check Focus and NotiBar’s macOS alert settings."
+                } else {
+                    notificationTestResult = "Accepted by macOS, but not found in Notification Center. It may have been dismissed or suppressed."
+                }
+            } catch {
+                notificationError = error.localizedDescription
+                notificationTestResult = "Notification check failed."
+            }
+        }
+    }
+
     func postIncreaseNotification(for increasedApps: [Application]) {
+        guard notificationOnIncrease else { return }
+        let generation = notificationGeneration
         let center = UNUserNotificationCenter.current()
         let top = increasedApps.prefix(3)
         let summary = top.map { app in
@@ -826,11 +947,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject, NSPopoverD
         }.joined(separator: ", ")
         let content = UNMutableNotificationContent()
         content.title = "\(notificationIcon) Badge updates"
-        content.body = summary.isEmpty ? "Badge changes detected" : summary
+        content.body = summary.isEmpty ? "NotiBar notifications are working." : summary
         content.sound = .default
 
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        center.add(request, withCompletionHandler: nil)
+        Task {
+            center.delegate = self
+            guard notificationOnIncrease, generation == notificationGeneration else { return }
+            guard await refreshNotificationStatus(requestPermission: true) else { return }
+            guard notificationOnIncrease, generation == notificationGeneration else { return }
+            do {
+                try await center.add(request)
+                if !notificationOnIncrease || generation != notificationGeneration {
+                    center.removePendingNotificationRequests(withIdentifiers: [request.identifier])
+                    center.removeDeliveredNotifications(withIdentifiers: [request.identifier])
+                }
+            } catch {
+                notificationError = "Couldn’t send notification: \(error.localizedDescription)"
+            }
+        }
     }
 
     func updateTitle(appsWithBadges: [Application]) {

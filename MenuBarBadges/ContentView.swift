@@ -19,17 +19,20 @@ struct ContentView: View {
             NotiBarHeader(autoRefreshEnabled: appDelegate.autoRefreshEnabled)
                 .padding(20)
 
-            RefreshStatusView(
-                isRefreshing: appDelegate.isRefreshing,
-                lastSuccess: appDelegate.lastSuccessfulRefresh,
-                errorMessage: appDelegate.refreshError,
-                accessibilityTrusted: appDelegate.accessibilityTrusted,
-                automationStatus: appDelegate.automationPermissionStatus,
-                refresh: { appDelegate.updateMenuBarDisplay() },
-                openSettings: { appDelegate.showSettings() }
-            )
-            .padding(.horizontal, 20)
-            .padding(.bottom, 12)
+            if appDelegate.refreshError != nil || !appDelegate.accessibilityTrusted
+                || appDelegate.automationPermissionStatus == .denied {
+                RefreshStatusView(
+                    isRefreshing: appDelegate.isRefreshing,
+                    lastSuccess: appDelegate.lastSuccessfulRefresh,
+                    errorMessage: appDelegate.refreshError,
+                    accessibilityTrusted: appDelegate.accessibilityTrusted,
+                    automationStatus: appDelegate.automationPermissionStatus,
+                    refresh: { appDelegate.updateMenuBarDisplay() },
+                    openSettings: { appDelegate.showSettings() }
+                )
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+            }
 
             if appDelegate.displayMode == .popover, let banner = appDelegate.lastIncreaseSummary {
                 HStack(alignment: .top, spacing: 10) {
@@ -104,6 +107,14 @@ struct ContentView: View {
                     Label("Settings", systemImage: "gearshape")
                 }
                 Spacer()
+                Button {
+                    appDelegate.updateMenuBarDisplay()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .disabled(appDelegate.isRefreshing)
+                .accessibilityLabel("Refresh badges")
+                .help("Refresh badges")
                 Button {
                     showingHelp = true
                 } label: {
