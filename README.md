@@ -2,6 +2,18 @@
 
 NotiBar is a macOS menu bar app that monitors numeric Dock badges and brings apps with unread activity into one place. The Xcode project and app target are named **MenuBarBadges**; the built app is **NotiBar**.
 
+## Customer documentation
+
+Read the **[NotiBar user guide](docs/USER_GUIDE.md)** for first-time setup, screenshots, every setting explained, practical examples, and troubleshooting.
+
+- [Get started and grant permissions](docs/USER_GUIDE.md#first-time-setup)
+- [Compare Popover and Menu Bar modes](docs/USER_GUIDE.md#choose-a-display-mode)
+- [Learn what every setting does](docs/USER_GUIDE.md#settings-reference)
+- [Try everyday configurations](docs/USER_GUIDE.md#everyday-examples)
+- [Fix missing notification banners](docs/USER_GUIDE.md#notifications-arrive-but-no-banner-appears)
+
+<img src="docs/images/popup-empty.png" alt="NotiBar popup with search and footer controls, shown in an Xcode preview" width="320">
+
 ## Features
 
 - **Popover mode:** a menu bar icon opens a searchable list of apps with badges.
@@ -9,7 +21,7 @@ NotiBar is a macOS menu bar app that monitors numeric Dock badges and brings app
 - **Alerts:** configurable sounds, system notifications, an in-popover banner, and a menu bar color pulse that keeps the item's width stable.
 - **Quiet startup:** the first successful scan establishes a baseline; subsequent count increases trigger alerts.
 - **Refresh controls:** automatic or manual refresh, a configurable interval, retry backoff after failures, and sleep/wake handling.
-- **Scan status:** shows refresh progress and errors while retaining the last successful badge snapshot.
+- **Scan status:** shows permission issues and errors while retaining the last successful badge snapshot; routine timestamps stay hidden.
 - **Launch at Login:** optional registration with macOS, including approval guidance when required.
 
 ## Build and run
@@ -57,6 +69,8 @@ The Swift Testing suite covers:
 - Failed-scan recovery, snapshot preservation, and retry backoff.
 - Stable menu bar width during blinking and cancellation when switching modes.
 - Pausing scans during sleep and resuming on wake.
+- Notification routing for increases and newly badged apps in both modes, including disabled notifications.
+- Filled versus outline bell appearance as badge presence changes.
 
 These tests use injected Dock snapshots. Actual permissions, Dock integration, and launch-at-login behavior also need verification in a running app.
 
